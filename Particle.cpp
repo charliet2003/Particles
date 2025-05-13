@@ -1,133 +1,112 @@
+
 #include "Particle.h"
-#include <cstdlib>
-#include <cmath>
-#include <ctime>
 
-Particle::Particle(RenderTarget& target, int numPoints, Vector2i mouseClickPosition)
-    : m_ttl(TTL)
-    , m_numPoints(numPoints)
-    , m_radiansPerSec(static_cast<float>(rand()) / RAND_MAX * M_PI)
-    , m_cartesianPlane()
-    , m_color1(Color::White)
-    , m_A(2, numPoints)
+Particle::Particle(RenderTarget& target, int numPoints, Vector2i mouseClickPosition) : m_A(2, numPoints)
 {
-    // Seed random once in Engine; no need here
-    // Setup Cartesian view
-    m_cartesianPlane.setCenter(0, 0);
-    m_cartesianPlane.setSize(
-        static_cast<float>(target.getSize().x),
-        -static_cast<float>(target.getSize().y)
-    );
+    m_ttl = TTL;
+    m_numPoints = numPoints;
+    m_radiansPerSec = static_cast<float>(rand()) / RAND_MAX * M_PI;
 
-    // Map click to Cartesian center
+    m_cartesianPlane.setCenter(0, 0);  
+    m_cartesianPlane.setSize(static_cast<float>(target.getSize().x), -static_cast<float>(target.getSize().y)); 
     m_centerCoordinate = target.mapPixelToCoords(mouseClickPosition, m_cartesianPlane);
+    
+    m_vx = (rand() % 401 + 100);  
+    if (rand() % 2) 
+        m_vx = -m_vx;  
 
-    // Initial velocities
-    m_vx = 100 + rand() % 401; // [100, 500]
-    if (rand() % 2) m_vx = -m_vx;
-    m_vy = 100 + rand() % 401;
+    m_vy = (rand() % 401 + 100);  
+    if (rand() % 2) 
+        m_vy = -m_vy;  
 
-    // Random outer color
-    m_color2 = Color(
-        static_cast<Uint8>(rand() % 256),
-        static_cast<Uint8>(rand() % 256),
-        static_cast<Uint8>(rand() % 256)
-    );
+    m_color1 = sf::Color::White;
+    m_color2 = sf::Color(rand() % 256, rand() % 256, rand() % 256);
+    float theta = static_cast<float>(rand()) / RAND_MAX * (M_PI / 2);  
+    float dTheta = 2.0f * M_PI / (m_numPoints - 1);  
 
-    // Generate shape vertices
-    float theta = static_cast<float>(rand()) / RAND_MAX * (M_PI / 2.0f);
-    float dTheta = 2.0f * M_PI / (numPoints - 1);
-    for (int j = 0; j < m_numPoints; ++j)
+    for (size_t j = 0; j < m_numPoints; j++) 
     {
-        float r = 20.0f + rand() % 61; // [20, 80]
-        float dx = r * std::cos(theta);
-        float dy = r * std::sin(theta);
+        float r = (rand() % 61 + 20);  
+        float dx = r * cos(theta);  
+        float dy = r * sin(theta);  
         m_A(0, j) = m_centerCoordinate.x + dx;
         m_A(1, j) = m_centerCoordinate.y + dy;
         theta += dTheta;
     }
+    
 }
 
 void Particle::draw(RenderTarget& target, RenderStates states) const
 {
-    VertexArray lines(TriangleFan, m_numPoints + 1);
+    VertexArray lines(PrimitiveType::TriangleFan, m_numPoints + 1);
 
-    // Center pixel conversion
-    Vector2i pixelCenterI = target.mapCoordsToPixel(m_centerCoordinate, m_cartesianPlane);
-    Vector2f pixelCenter(static_cast<float>(pixelCenterI.x), static_cast<float>(pixelCenterI.y));
-    lines[0].position = pixelCenter;
-    lines[0].color = m_color1;
+    Vector2f center = static_cast<sf::Vector2f>(target.mapCoordsToPixel(m_centerCoordinate, m_cartesianPlane));
+    lines[0].position = center;
+    lines[0].color = m_color1;  
 
-    // Outer vertices conversion
-    for (int j = 1; j <= m_numPoints; ++j)
+    for (int j = 0; j < m_numPoints; j++) 
     {
-        Vector2f coord(
-            static_cast<float>(m_A(0, j - 1)),
-            static_cast<float>(m_A(1, j - 1))
-        );
-        Vector2i pixelI = target.mapCoordsToPixel(coord, m_cartesianPlane);
-        Vector2f pixel(static_cast<float>(pixelI.x), static_cast<float>(pixelI.y));
-        lines[j].position = pixel;
-        lines[j].color = m_color2;
+        Vector2f vertexPos = static_cast<sf::Vector2f>(target.mapCoordsToPixel(Vector2f(m_A(0, j), m_A(1, j)), m_cartesianPlane));
+        lines[j + 1].position = vertexPos;
+        lines[j + 1].color = m_color2; 
     }
-
-    target.draw(lines);
+    target.draw(lines, states);
 }
 
 void Particle::update(float dt)
 {
     m_ttl -= dt;
+
     rotate(dt * m_radiansPerSec);
     scale(SCALE);
 
-    // Translate by velocity and gravity
     float dx = m_vx * dt;
-    m_vy -= G * dt;
+    m_vy -= G * dt; 
+
     float dy = m_vy * dt;
     translate(dx, dy);
 }
 
-void Particle::translate(double xShift, double yShift)
+
+void Particle::translate(double xShift, double yShift) 
 {
-    TranslationMatrix T(xShift, yShift, m_A.getCols());
+    TranslationMatrix T(xShift, yShift, m_numPoints);
+
     m_A = T + m_A;
-    m_centerCoordinate.x += static_cast<float>(xShift);
-    m_centerCoordinate.y += static_cast<float>(yShift);
+    m_centerCoordinate.x += xShift;
+    m_centerCoordinate.y += yShift;
 }
+
 
 void Particle::rotate(double theta)
 {
-    // Move to origin
     Vector2f temp = m_centerCoordinate;
-    translate(-temp.x, -temp.y);
+    translate(-m_centerCoordinate.x, -m_centerCoordinate.y);
+    RotationMatrix R(theta); 
+ 
 
-    // Rotate
-    RotationMatrix R(theta);
-    m_A = R * m_A;
-
-    // Move back
+    m_A = R * m_A;  
     translate(temp.x, temp.y);
 }
 
-void Particle::scale(double c)
+void Particle::scale(double c) 
 {
-    // Move to origin
     Vector2f temp = m_centerCoordinate;
-    translate(-temp.x, -temp.y);
+    translate(-m_centerCoordinate.x, -m_centerCoordinate.y);
 
-    // Scale
     ScalingMatrix S(c);
-    m_A = S * m_A;
 
-    // Move back
+    m_A = S * m_A;
     translate(temp.x, temp.y);
 }
+
 
 bool Particle::almostEqual(double a, double b, double eps)
 {
-	return fabs(a - b) < eps;
+    return fabs(a - b) < eps;
 }
 
+// Recopied from Canvas
 void Particle::unitTests()
 {
     int score = 0;

@@ -1,3 +1,4 @@
+
 #pragma once
 #pragma once
 #include <SFML/Graphics.hpp>
@@ -8,22 +9,21 @@ using namespace std;
 class Engine
 {
 private:
-	// A regular RenderWindow
-	RenderWindow m_Window;
-
-	//vector for Particles
-	vector<Particle> m_particles;
-
-	// Private functions for internal use only
-	void input();
-	void update(float dtAsSeconds);
-	void draw();
-
+    // A regular RenderWindow
+    RenderWindow m_Window;
+    //vector for Particles
+    vector<Particle> m_particles;
+    // Celebration mode
+    bool celebration_mode = false;
+    time_t currtime;
+    // Private functions for internal use only
+    void input();
+    void update(float dtAsSeconds);
+    void draw();
+    void celebrate();
 public:
-	// The Engine constructor
-	Engine();
-
-	// Run will call all the private functions
-	void run();
-
+    // The Engine constructor
+    Engine();
+    // Run will call all the private functions
+    void run();
 };
